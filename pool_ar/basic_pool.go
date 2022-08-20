@@ -54,7 +54,7 @@ type IPoolOfResource interface{
 	GetLimit( ) int // максимальное количество ресурсов
 	GetCntFree( ) int  // количество свободных ресурсов]
 	
-	Resource_Finalizing( r ISingleResource ) error; // ресурс сигнализирует о начале завершение 
+	Resource_Finalizing( r ISingleResource ) error; // ресурс сигнализирует о начале завершения 
 	Resource_Finalized( r ISingleResource ) error; // ресурс сигнализирует о завершении
 }
 
