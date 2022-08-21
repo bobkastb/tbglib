@@ -142,7 +142,7 @@ type TResourcePoolRec struct {
 }   
 
 
-type Basic_Pool struct {
+type PoolOfResource struct {
 	idname string // Идентификатор пула. 
 	stat Pool_statictic_rec; // статистика пула
 	active bool // Пул активен
@@ -166,16 +166,16 @@ type Basic_Pool struct {
 }
 
 // Перенаправить сообщения об ошибках
-func (p*Basic_Pool) SetErrorStream(elog tools.ILogErrorEvent){  p.errlog = elog; };
+func (p*PoolOfResource) SetErrorStream(elog tools.ILogErrorEvent){  p.errlog = elog; };
 
 // Перенаправить лог-сообщения  пула
-func (p*Basic_Pool) SetLogger(log tools.ILevelLogger){ p.logger = log;};
+func (p*PoolOfResource) SetLogger(log tools.ILevelLogger){ p.logger = log;};
 
 // Нового пула.  limit - максимальное количество активных ресурсов. newr - функция создания нового ресурса.
-func NewPool( limit int , newr fCreateResFromPool ) *Basic_Pool {
+func NewPool( limit int , newr fCreateResFromPool ) *PoolOfResource {
 	if (limit<=0) { limit = 5;}
 	
-	p:= &Basic_Pool{
+	p:= &PoolOfResource{
 		//poolLimit: runtime.NumCPU() * 2,
 		stat:Pool_statictic_rec {
 			all_created:0 ,all_closed :0 , created:0,
@@ -202,13 +202,13 @@ func NewPool( limit int , newr fCreateResFromPool ) *Basic_Pool {
 }
 
 // Возвращает количество свободных ресурсов в пуле
-func (p *Basic_Pool) GetCntFree( ) int{ 	return len(p.pool); }
+func (p *PoolOfResource) GetCntFree( ) int{ 	return len(p.pool); }
 
 // Возвращает максимальное количество ресурсов в пуле
-func (p *Basic_Pool) GetLimit( ) int{ 	return cap(p.pool); }
+func (p *PoolOfResource) GetLimit( ) int{ 	return cap(p.pool); }
 
  
-func (p *Basic_Pool) newResourse() (ISingleResource, error) {
+func (p *PoolOfResource) newResourse() (ISingleResource, error) {
 	if (p.new_resource==nil) { return nil,nil; }
 	prc,e := p.new_resource( p ) ;
 	if (e!=nil) {  
@@ -220,7 +220,7 @@ func (p *Basic_Pool) newResourse() (ISingleResource, error) {
 // pool_lock_ctx создан для того чтобы не писать сообщения в логер, до тех пор пока код назодтся внутри мьютекса
 type pool_lock_ctx struct {
 	err *ErrorBasicPool;
-	pool *Basic_Pool;
+	pool *PoolOfResource;
 	islock bool 
 }
 func (lctx *pool_lock_ctx) Lock() { lctx.islock=true; lctx.pool.mut.Lock(); }
@@ -247,7 +247,7 @@ func (lctx *pool_lock_ctx) MakeErrorAndMsg(level int , code int,  errstr string)
 func (lctx *pool_lock_ctx) MakeError(code int, errstr string) *ErrorBasicPool { return lctx.MakeErrorAndMsg(tools.VerboseLevel,code,errstr); }
 
 
-func (p *Basic_Pool) makeErrorOnly( level int , code int,  errstr string) *ErrorBasicPool {
+func (p *PoolOfResource) makeErrorOnly( level int , code int,  errstr string) *ErrorBasicPool {
 	if 0==(p.errmask_IgnLog & (1<<code)){ 		
 		atomic.AddInt32( &p.stat.errors ,1 )
 		if (code<len(p.stat.errors_a)) { atomic.AddInt32( &p.stat.errors_a[code] ,1 ) }
@@ -259,24 +259,24 @@ func (p *Basic_Pool) makeErrorOnly( level int , code int,  errstr string) *Error
 		pool:p,
 	}	
 }	
-func (p *Basic_Pool) pushError2Log( err*ErrorBasicPool)  { 
+func (p *PoolOfResource) pushError2Log( err*ErrorBasicPool)  { 
 	if 0!=(p.errmask_IgnLog & (1<<err.Code)){  return;	}
 	if (p.logger!=nil) { p.logger.LPrintf( err.Level , "%s:%s\n",p.idname, err.Txt ); }
 	if (p.errlog!=nil) { p.errlog.LogErrorEvent( err ) }
 
 }
-func (p *Basic_Pool) _MakeErrorAndMsg( level int , code int,  errstr string) *ErrorBasicPool { 
+func (p *PoolOfResource) _MakeErrorAndMsg( level int , code int,  errstr string) *ErrorBasicPool { 
 	e:= p.makeErrorOnly( level , code , errstr )
 	p.pushError2Log(e);
 	return e;
 }
-func (p *Basic_Pool) _MakeError_Verb( code int, errstr string) *ErrorBasicPool { return p._MakeErrorAndMsg(tools.VerboseLevel,code,errstr); }	
-func (p *Basic_Pool) _MakeError(code int, errstr string) *ErrorBasicPool { return p._MakeErrorAndMsg(tools.VerboseLevel,code,errstr); }
+func (p *PoolOfResource) _MakeError_Verb( code int, errstr string) *ErrorBasicPool { return p._MakeErrorAndMsg(tools.VerboseLevel,code,errstr); }	
+func (p *PoolOfResource) _MakeError(code int, errstr string) *ErrorBasicPool { return p._MakeErrorAndMsg(tools.VerboseLevel,code,errstr); }
 
 
 //--------------
 
-func (p *Basic_Pool) RegNewResourse( res ISingleResource) (*TResourcePoolRec,error) {
+func (p *PoolOfResource) RegNewResourse( res ISingleResource) (*TResourcePoolRec,error) {
 	lctx := pool_lock_ctx{ pool:p}; lctx.Lock();defer lctx.Unlock(); 
 	//p.mut.Lock(); defer p.mut.Unlock(); 
 
@@ -309,7 +309,7 @@ func (p *Basic_Pool) RegNewResourse( res ISingleResource) (*TResourcePoolRec,err
 	
 }
 
-func (p *Basic_Pool) getResourceVars(res ISingleResource) *TResourcePoolRec{
+func (p *PoolOfResource) getResourceVars(res ISingleResource) *TResourcePoolRec{
 	if (res==nil) { return nil; }
 	r,load := p.storage.Load(res);
 	if load { return r.(*TResourcePoolRec) } 
@@ -318,7 +318,7 @@ func (p *Basic_Pool) getResourceVars(res ISingleResource) *TResourcePoolRec{
 
 
 // ресурс сигнализирует о начале завершение 
-func (p *Basic_Pool) Resource_Finalizing( res ISingleResource )error { 
+func (p *PoolOfResource) Resource_Finalizing( res ISingleResource )error { 
 	lctx := pool_lock_ctx{ pool:p}; lctx.Lock();defer lctx.Unlock(); 
 	//p.mut.Lock(); defer p.mut.Unlock(); 
 	rv := p.getResourceVars(res);
@@ -330,7 +330,7 @@ func (p *Basic_Pool) Resource_Finalizing( res ISingleResource )error {
 	return nil;
  };
 
-func (p *Basic_Pool) delete_resourse( res ISingleResource , lctx * pool_lock_ctx )  {
+func (p *PoolOfResource) delete_resourse( res ISingleResource , lctx * pool_lock_ctx )  {
 	_,ok := p.storage.LoadAndDelete( res );
 	if (ok) {
 		//resvars := r.(*TResourcePoolRec)
@@ -340,7 +340,7 @@ func (p *Basic_Pool) delete_resourse( res ISingleResource , lctx * pool_lock_ctx
 }
 
 const eContinueWait = true
-func (p *Basic_Pool) FetchHandler( resp * ISingleResource , vbreak bool ) ( bool , error ) {
+func (p *PoolOfResource) FetchHandler( resp * ISingleResource , vbreak bool ) ( bool , error ) {
 	lctx := pool_lock_ctx{ pool:p}; lctx.Lock();defer lctx.Unlock(); 
 	//p.mut.Lock(); defer p.mut.Unlock(); 
 	
@@ -376,13 +376,13 @@ func (p *Basic_Pool) FetchHandler( resp * ISingleResource , vbreak bool ) ( bool
 	return false,nil
 }	
 //func (p *Basic_Pool) tryBackToPool( )
-func (p *Basic_Pool) user_interrupt_err(  ) error { 
+func (p *PoolOfResource) user_interrupt_err(  ) error { 
 	atomic.AddInt32(&p.stat.pop_interrupt,1)
 	return p._MakeErrorAndMsg(tools.VerboseLevel,Err_Breaked_Fetch,"Interrupted");  // прерывание пользователя
 }	
 
 //Захват ресурса из пула с ожиданием. interrupt_chans - массив каналов прерывателей ожидания. Любое событие (данные,закрнытие) в одном из каналов приведет к прерыванию ожидания
-func (p *Basic_Pool) Fetch( interrupt_chans  ... any ) (ISingleResource, error) {
+func (p *PoolOfResource) Fetch( interrupt_chans  ... any ) (ISingleResource, error) {
 	var res ISingleResource = nil;
 	var err error=nil; 
 	//indexOfPool:=0
@@ -418,7 +418,7 @@ func (p *Basic_Pool) Fetch( interrupt_chans  ... any ) (ISingleResource, error) 
 }
 
 // ресурс сигнализирует о завершении
-func (p *Basic_Pool) Resource_Finalized( res ISingleResource ) error{ 
+func (p *PoolOfResource) Resource_Finalized( res ISingleResource ) error{ 
 	// проверка что нет повторов вызова Resource_Finalized
 	//p.mut.Lock(); 	defer p.mut.Unlock(); 
 	lctx := pool_lock_ctx{ pool:p}; lctx.Lock();defer lctx.Unlock(); 
@@ -448,7 +448,7 @@ func (p *Basic_Pool) Resource_Finalized( res ISingleResource ) error{
 };
 
 type _ErrPullFull = bool
-func (p *Basic_Pool) push( res ISingleResource ) *ErrorBasicPool  {
+func (p *PoolOfResource) push( res ISingleResource ) *ErrorBasicPool  {
 	if tools.IsNil(res) {	
 		return nil; }
 	lctx := pool_lock_ctx{ pool:p}; lctx.Lock();defer lctx.Unlock(); 
@@ -494,7 +494,7 @@ func (p *Basic_Pool) push( res ISingleResource ) *ErrorBasicPool  {
 
 
 //Возврат ресурса в пул
-func (p *Basic_Pool) Release(res ISingleResource) error {
+func (p *PoolOfResource) Release(res ISingleResource) error {
 	e := p.push(res);
 	if (e!=nil && e.Code==Err_PullFull_Release ) {  res.UnwantedFromPoll(); }
 	if (e==nil) {return nil}
@@ -503,7 +503,7 @@ func (p *Basic_Pool) Release(res ISingleResource) error {
 
 
 // Закрыть пул. Если wait==true, то будет ожидание завершения захватов (fetch) во всех горутинах
-func (p *Basic_Pool) Close( wait bool){
+func (p *PoolOfResource) Close( wait bool){
 	func () {
 		p.mut.Lock(); 
 		defer p.mut.Unlock(); 

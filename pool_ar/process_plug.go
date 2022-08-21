@@ -1,0 +1,89 @@
+package pool_ar
+
+import (
+	"fmt"
+	"sync/atomic"
+	"time"
+)
+
+
+
+type Recourse_ProcPlug struct {
+	name string;
+	id int32;
+	state int;
+	finstate int;
+	//pool_state int32;
+	//owner_pool IPoolOfResource;
+	pool pool_ar.IPoolOfResource; 
+	pool_data *pool_ar.TResourcePoolRec;
+}	
+func (prc *Recourse_ProcPlug) IsFinalizing() int {
+	 return prc.state;};
+func (prc *Recourse_ProcPlug) UnwantedFromPoll(){ prc.Stop(); }; 
+
+func (prc *Recourse_ProcPlug) CommonToPool( pool pool_ar.IPoolOfResource , pd*pool_ar.TResourcePoolRec) error { 
+	prc.pool = pool;
+	prc.pool_data= pd; return nil;
+ }
+func (prc *Recourse_ProcPlug) GetPoolVars() *pool_ar.TResourcePoolRec { return prc.pool_data;};
+func (prc *Recourse_ProcPlug) GetOwnedPool() pool_ar.IPoolOfResource { return prc.pool; }
+//func (prc *Proc) SetOwnerPool( pool IPoolOfResource){ prc.owner_pool = pool; }
+
+func (prc *Recourse_ProcPlug) IsTerminate() bool {
+	return prc.finstate>=2;
+}
+
+func (prc *Recourse_ProcPlug) GetTerminateChan() <- chan int {
+	return nil;
+}
+func (prc *Recourse_ProcPlug) TestWorkState() error{
+	return nil;
+}
+
+func (prc *Recourse_ProcPlug) AfterKill() error {
+	if prc.finstate>=3 { return nil; }
+	prc.finstate=3; prc.state = pool_ar.Erest_Finalized;
+	if (prc.pool!=nil) { 
+		prc.pool.Resource_Finalized(prc);}	
+	return nil
+}
+func (prc *Recourse_ProcPlug) Kill_prep() error {	
+	if prc.finstate>=2 { return nil; }
+	prc.finstate=2; prc.state = pool_ar.Erest_Finalizing;
+	return prc.pool.Resource_Finalizing(prc);
+}	
+func (prc *Recourse_ProcPlug) Kill() error {	
+	if prc.finstate>=2 { return nil; }
+	finstate := prc.finstate; prc.finstate=2; prc.state = pool_ar.Erest_Finalizing;
+	if (finstate==0 && prc.pool!=nil) { prc.pool.Resource_Finalizing(prc);}
+	if (prc.pool==nil) { return nil;}
+	//prc.pool.Resource_Finalized(prc);	
+	go func () { time.Sleep(10*time.Millisecond); prc.AfterKill(); }();
+	return nil;};
+
+func (prc *Recourse_ProcPlug) Stop() error {	
+	if prc.finstate>=1 { return nil; }
+	finstate := prc.finstate; prc.finstate=1;	prc.state = pool_ar.Erest_Finalizing;
+	if (finstate==0 && prc.pool!=nil) { prc.pool.Resource_Finalizing(prc);}
+	if (prc.pool!=nil) { prc.pool.Resource_Finalizing(prc);}
+	go func () { time.Sleep(10*time.Millisecond); prc.Kill(); }();
+	return nil;};
+
+
+
+	
+var cntr_proc int32=0;
+func NewProcPlug( pool pool_ar.IPoolOfResource ) (*Recourse_ProcPlug, error) {
+	atomic.AddInt32(&cntr_proc,1);
+	res:= &Recourse_ProcPlug{
+		pool : pool,
+		id : cntr_proc,
+		name:fmt.Sprintf("res-%d",cntr_proc),
+		pool_data: nil,
+	};
+	return res,nil;
+}
+
+
+

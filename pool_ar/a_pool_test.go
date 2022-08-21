@@ -2,12 +2,31 @@ package pool_ar
 
 import (
 	"fmt"
+	"os"
 	"runtime"
 	"sync/atomic"
 	"tbglib/tools"
 	"testing"
 	"time"
 )
+
+type CLog struct {} 
+var currlog CLog;
+func (l *CLog) LPrintf(level int,format string, v ...interface{}) {
+	f:= os.Stdout; if (level<0) {f=os.Stderr};
+	fmt.Fprintf( f , format ,  v ... )
+} 
+type CLogStream struct {} 
+func (s*CLogStream) LogErrorEvent( e error ){
+	ebp,ok := e.(*tools.ErrorWithCode);
+	if (ok) {
+		if (ebp.Code==Err_Breaked_Fetch) { return }
+		f:= os.Stdout; if (ebp.Level<0) {f=os.Stderr};
+		fmt.Fprintf( f , "error: %d %s \n" , ebp.Level , ebp.Txt )
+	}
+
+};
+var currlogstream CLogStream;
 
 
 func Fail(t *testing.T) {
