@@ -41,11 +41,22 @@ type Process_Basic struct {
 	cmd *exec.Cmd  // go обертка для процессов ОС
 	stdin io.WriteCloser // стандартный go pipe (StdInPipe) 
 	pool pool_ar.IPoolOfResource // принадлежность к пулу ресурсов, если nil, то процесс вне пула
+	status int32
 	//termnate_chan chan any //*Process_Basic
 }
 //func (p* Process_Basic) Lock() { p.mu.Lock() }
 //func (p* Process_Basic) Unlock() { p.mu.Unlock() }
 func (p* Process_Basic) Getstate() *os.ProcessState  { return p.cmd.ProcessState; }
+
+
+func (p* Process_Basic) GetTerminateChan() <- chan int {
+	return nil;
+}
+func (p* Process_Basic) TestWorkState() error{
+	if p.IsTerminate() { return &pool_ar.EResourceTerminated; }
+	if (p.status>1) { return &pool_ar.EResourceTerminating; }
+	return nil;
+}
 
 // Возвращает true если процесс завершен
 func (p* Process_Basic) IsTerminate() bool { 
@@ -69,12 +80,14 @@ func (p* Process_Basic) Start() error {
 }
 // Уничтожение процесса
 func (p* Process_Basic) Kill(  )(error) { 
+	if (p.status<3) { p.status=3; }
 	if (p.pool!=nil) { p.pool.Resource_Finalizing(p); } 
 	return p.cmd.Process.Kill()
 }
 
 // Команда завершения процесса
 func (p* Process_Basic) Stop(  )(error) { 
+	if (p.status<2) { p.status=2; }
 	if (p.pool!=nil) { p.pool.Resource_Finalizing(p); } 
 	return p.cmd.Process.Release()
  }
@@ -107,6 +120,7 @@ func (p* Process_Basic) IsolateStdError() {
  
 func (p* Process_Basic) InitCmd( name string , arg []string ) {
 	p.mu = &sync.Mutex{}
+	p.status=1;
 	p.cmd = exec.Command( name , arg... )
 	p.cmd.Stdout = buffs.NewSyncBufferLines( p.mu , make(chan int,1) )
 	p.cmd.Stderr = p.cmd.Stdout;

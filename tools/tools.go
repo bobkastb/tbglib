@@ -305,3 +305,18 @@ func (t *cBytesTransformer) ReadAll() []byte  {
 	lenout :=t.DoTransform()
 	return t.out_membuff[:lenout]; 
 }
+
+
+func Try_push_toIntChan( ch chan int , val int ) bool {
+	select { case ch <- 0: return true; default: return false }	
+}
+
+var defClosedIntChan <-chan int;
+var defInfiniteIntChan <-chan int = make(chan int);
+
+func GetClosedIntChan() <-chan int {
+	return defClosedIntChan; 
+}
+func GetInfiniteIntChan() <-chan int {
+	return defInfiniteIntChan; 
+}

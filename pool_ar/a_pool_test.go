@@ -9,11 +9,23 @@ import (
 	"time"
 )
 
+
 func Fail(t *testing.T) {
 	funcName,file,line,ok := runtime.Caller(1);
 	//t.Errorf("error at %s func %s line %d %v",file,funcName,line,ok);
 	t.Errorf("error at %s func (%d) line %d %v",file,funcName,line,ok);
 }
+
+func fetch_proc( p IPoolOfResource , ex ... any ) (*Recourse_ProcPlug,*ErrorBasicPool){
+	r,e := p.Fetch(ex...);
+	err := (*ErrorBasicPool)(nil);
+	if (e!=nil) { err = e.(*ErrorBasicPool) }
+	if (r==nil) { 
+		return nil,err; }
+	return r.(*Recourse_ProcPlug),err;
+}
+
+func Pool_NewProc(pool_ IPoolOfResource) (ISingleResource,error) { return NewProcPlug(pool_); }
 
 type tst_gen_stat struct {
 	cnt_timeout int
