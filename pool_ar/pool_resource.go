@@ -387,10 +387,12 @@ func (p *PoolOfResource) Fetch( interrupt_chans  ... any ) (ISingleResource, err
 	var err error=nil; 
 	//indexOfPool:=0
 	indexOfPool:= len(interrupt_chans);
-	var local_chans [10]any ; var chans []any;
-	if (indexOfPool==0) { // не будем без необходимости засорять хип
-		chans = tools.EcoCat_AnyArray( local_chans[0:], []any{p.pool} , interrupt_chans... );
-	} else { chans = tools.EcoCat_AnyArray( local_chans[0:],interrupt_chans,p.pool ); }
+	var local_chans [10]any ; 
+	chans := local_chans[:0];
+	if (indexOfPool==0) { 
+		chans = tools.Cat_any_array( chans , []any{p.pool} , interrupt_chans )
+	} else { 
+		chans = tools.Cat_any_array( chans, interrupt_chans, []any{p.pool} ); }
 
 	for (p.active) {
 		// Прерывания в приоритетет. Правильно конечно проверять это после Read_chans, но тогда придется восстанавливать пул (класть туда то что сняли)

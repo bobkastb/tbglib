@@ -53,6 +53,7 @@ func Test_cmd1(t *testing.T){
 	if !cc.IsTerminate() { Fail(t)}
 	fmt.Println("Process terminated")
 	
+	
 }
 
 

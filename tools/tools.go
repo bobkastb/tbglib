@@ -94,17 +94,21 @@ func IfElse( cond bool , if_val any , else_val any )any{
 	if (cond) { return if_val;}; return else_val;
 }
 
-// Экономный вариант append. Сделан для того чтобы лишний раз не засорять кучу. Локальный массив имееь шанс отстаться локальным.
-// localarr - результирующий массив .  localarr = append(leftarr,rightarr)
-func EcoCat_AnyArray( localarr []any, leftarr []any, rightarr ... any )[]any{
-	szleft :=len(leftarr); sz := szleft + len(rightarr);
-	res:=localarr;
-	if (len(localarr)< sz) { res= make([]any,sz) }
-	for i,v := range leftarr { res[i]=v }
-	for i,v := range rightarr { res[i+szleft]=v }
-	return res[0:sz]
-
+// Экономный вариант append. Сделан для того чтобы лишний раз не засорять кучу. Если емкости слайса не хватает, то сразу расчитываем нужную емкость
+func Cat_any_array( dest []any , srcs ... []any) []any {
+	capa0 := cap(dest);
+	needsz :=len(dest); 
+	for _,src := range srcs { needsz+= len(src) }
+	if (needsz>capa0) {
+		newd := make( []any , needsz);
+		dest = append( newd[:0] , dest )
+	}
+	for _,src := range srcs {
+		dest = append( dest , src... )
+	}
+	return dest
 }
+
 
 // I2ChanValue: возвращает reflect.Value если ach  это Chan
 func I2ChanValue( ach any ) (reflect.Value,bool) {
