@@ -94,17 +94,17 @@ func IfElse( cond bool , if_val any , else_val any )any{
 	if (cond) { return if_val;}; return else_val;
 }
 
-// Экономный вариант append. Сделан для того чтобы лишний раз не засорять кучу. Если емкости слайса не хватает, то сразу расчитываем нужную емкость
+// Экономный вариант append. Сделан для того чтобы лишний раз не засорять кучу. Если емкости слайса <dest> не хватает, то сразу расчитываем нужную емкость
 func Cat_any_array( dest []any , srcs ... []any) []any {
 	capa0 := cap(dest);
 	needsz :=len(dest); 
 	for _,src := range srcs { needsz+= len(src) }
 	if (needsz>capa0) {
 		newd := make( []any , needsz);
-		dest = append( newd[:0] , dest )
+		dest = append( newd[:0] , dest... )
 	}
 	for _,src := range srcs {
-		dest = append( dest , src... )
+		dest = append( dest , src...   )
 	}
 	return dest
 }
